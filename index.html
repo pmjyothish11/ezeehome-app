@@ -898,7 +898,7 @@ Be specific to what you actually see. Do not fabricate findings.`;
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: 'claude-sonnet-4-6',
-          max_tokens: 1000,
+          max_tokens: 2000,
           messages: [{ role: 'user', content: [...imageContents, { type: 'text', text: prompt }] }]
         })
       });
@@ -910,7 +910,11 @@ Be specific to what you actually see. Do not fabricate findings.`;
       const data = await response.json();
       const text = data.content?.[0]?.text || '{}';
       try {
-        const cleaned = text.replace(/```json|```/g, '').trim();
+        // Extract JSON from response - handle markdown blocks and plain JSON
+        let cleaned = text.trim();
+        const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+        if (jsonMatch) cleaned = jsonMatch[0];
+        cleaned = cleaned.replace(/```json|```/g, '').trim();
         const parsed = JSON.parse(cleaned);
         results[room.id] = {
           room: parsed.room || room.name,
