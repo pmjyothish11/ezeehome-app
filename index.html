@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>EzeeHome — LivEzee Home Safety Assessment</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,400;0,600;1,300&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
 <style>
   :root {
     --navy: #1e436c;
@@ -1065,146 +1065,115 @@ function renderResults(data) {
     </div>
 
     <div class="action-buttons">
-      <button class="pdf-btn" onclick="generatePDF()">Download PDF Report</button>
+      <button class="pdf-btn" onclick="generateWord()">Download Word Report</button>
       <button class="reset-btn" onclick="resetTool()">← New Assessment</button>
     </div>
   `;
 }
 
-function generatePDF() {
+function generateWord() {
   if (!analysisResults) return;
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const data = analysisResults;
 
-  const NAVY = [30, 67, 108];
-  const GOLD = [201, 168, 76];
-  const DARK = [19, 42, 68];
-  const WHITE = [255, 255, 255];
-  const LIGHT = [247, 245, 240];
+  const riskBg = { high: '#fdeaea', medium: '#fef5e7', low: '#eafaf1', unknown: '#f5f5f5' };
+  const riskColor = { high: '#c0392b', medium: '#d68910', low: '#1e8449', unknown: '#666666' };
 
-  let y = 0;
-
-  function addPage() {
-    doc.addPage();
-    y = 20;
-    // Header stripe
-    doc.setFillColor(...DARK);
-    doc.rect(0, 0, 210, 12, 'F');
-    doc.setFillColor(...GOLD);
-    doc.rect(0, 12, 210, 1.5, 'F');
-    doc.setTextColor(...WHITE);
-    doc.setFontSize(8);
-    doc.text('LivEzee · EzeeHome Safety Assessment', 14, 8);
-    doc.text(data.clientName || '', 196, 8, { align: 'right' });
-    y = 22;
+  function section(title, items, bg, color) {
+    if (!items || items.length === 0) return '';
+    return `
+      <p style="font-size:10pt;font-weight:bold;color:#666;margin:12pt 0 4pt;text-transform:uppercase;letter-spacing:1px;">${title}</p>
+      ${items.map(item => `<p style="background:${bg};color:${color};padding:6pt 10pt;margin:3pt 0;font-size:10pt;">• ${item}</p>`).join('')}
+    `;
   }
 
-  // Cover
-  doc.setFillColor(...DARK);
-  doc.rect(0, 0, 210, 297, 'F');
-  doc.setFillColor(...GOLD);
-  doc.rect(0, 260, 210, 37, 'F');
-  doc.setFillColor(...GOLD);
-  doc.rect(10, 0, 4, 297, 'F');
+  let html = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+    <head><meta charset="UTF-8">
+    <style>
+      body { font-family: Arial, sans-serif; margin: 0; color: #222; }
+      .cover { background: #132a44; color: white; padding: 60pt 40pt; page-break-after: always; }
+      .cover h1 { font-size: 32pt; margin: 0 0 8pt; color: white; }
+      .cover h2 { font-size: 16pt; color: #c9a84c; font-weight: normal; margin: 0 0 20pt; }
+      .cover p { color: #aaaaaa; font-size: 10pt; margin: 4pt 0; }
+      .cover .tagline { color: #c9a84c; font-size: 13pt; margin-top: 40pt; }
+      .room-page { page-break-before: always; padding: 20pt 30pt; }
+      .room-header { background: #1e436c; color: white; padding: 10pt 14pt; margin-bottom: 12pt; display: flex; justify-content: space-between; align-items: center; }
+      .room-header h2 { margin: 0; font-size: 14pt; color: white; }
+      .risk-badge { padding: 3pt 10pt; border-radius: 4pt; font-size: 9pt; font-weight: bold; text-transform: uppercase; }
+      .summary { font-size: 10pt; color: #555; font-style: italic; margin-bottom: 14pt; line-height: 1.5; }
+      .priority-box { background: #faf3e0; border: 1.5pt solid #c9a84c; padding: 14pt; margin: 20pt 0; }
+      .priority-box h3 { color: #1e436c; font-size: 12pt; margin: 0 0 10pt; }
+      .priority-item { margin: 6pt 0; font-size: 10pt; color: #1e436c; }
+      .disclaimer { background: #f5f5f5; padding: 12pt; font-size: 9pt; color: #666; font-style: italic; line-height: 1.6; margin-top: 20pt; }
+      @page { margin: 2cm; }
+    </style>
+    </head><body>
 
-  doc.setTextColor(...WHITE);
-  doc.setFontSize(28);
-  doc.setFont('helvetica', 'bold');
-  doc.text('EzeeHome', 24, 80);
-  doc.setFontSize(16);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(...GOLD);
-  doc.text('Home Safety Assessment Report', 24, 92);
+    <div class="cover">
+      <h1>EzeeHome</h1>
+      <h2>Home Safety Assessment Report</h2>
+      <p>${data.clientName || 'Assessment Report'}</p>
+      ${data.address ? `<p>${data.address}</p>` : ''}
+      <p>${data.date}</p>
+      ${data.clientAge ? `<p>Age: ${data.clientAge}</p>` : ''}
+      ${data.mobility ? `<p>Mobility: ${data.mobility}</p>` : ''}
+      <p class="tagline">LivEzee Eldercare Private Limited · Trivandrum, Kerala</p>
+      <p style="color:#aaa;font-style:italic;">For living with confidence.</p>
+    </div>`;
 
-  doc.setTextColor(...WHITE);
-  doc.setFontSize(12);
-  doc.text(data.clientName || 'Assessment Report', 24, 120);
-  doc.setFontSize(10);
-  doc.setTextColor(180, 180, 180);
-  if (data.address) doc.text(data.address, 24, 130);
-  doc.text(data.date, 24, 140);
-  if (data.clientAge) doc.text(`Age: ${data.clientAge}`, 24, 150);
-  if (data.mobility) doc.text(`Mobility: ${data.mobility}`, 24, 160);
-
-  doc.setTextColor(...DARK);
-  doc.setFontSize(9);
-  doc.text('LivEzee Eldercare Private Limited · Trivandrum, Kerala', 24, 275);
-  doc.text('For living with confidence.', 24, 282);
+  // Priority actions summary
+  const allImmediate = Object.values(data.rooms).flatMap(r => (r.immediate_actions || []).map(a => ({ room: r.room, action: a })));
+  if (allImmediate.length > 0) {
+    html += `<div style="padding:20pt 30pt;">
+      <div class="priority-box">
+        <h3>Priority Actions — Address These First</h3>
+        ${allImmediate.slice(0, 8).map((item, i) => `
+          <p class="priority-item"><strong>${i + 1}. ${item.room}:</strong> ${item.action}</p>
+        `).join('')}
+      </div>
+    </div>`;
+  }
 
   // Room pages
   Object.entries(data.rooms).forEach(([roomId, result]) => {
-    addPage();
     const room = ROOMS.find(r => r.id === roomId);
-
     const roomName = result.room || room?.name || 'Room';
-    const riskLevel = result.overall_risk || 'medium';
+    const risk = result.overall_risk || 'medium';
+    const bg = riskBg[risk] || '#f5f5f5';
+    const col = riskColor[risk] || '#666';
 
-    // Room header
-    doc.setFillColor(...NAVY);
-    doc.rect(14, y, 182, 14, 'F');
-    doc.setTextColor(...WHITE);
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text(roomName, 20, y + 9);
-    const riskColor = riskLevel === 'high' ? [192, 57, 43] : riskLevel === 'medium' ? [214, 137, 16] : [30, 132, 73];
-    doc.setFillColor(...riskColor);
-    doc.roundedRect(155, y + 3, 35, 8, 2, 2, 'F');
-    doc.setFontSize(8);
-    doc.text(`${riskLevel.toUpperCase()} RISK`, 172.5, y + 8.5, { align: 'center' });
-    y += 20;
-
-    // Summary
-    if (result.risk_summary) {
-      doc.setTextColor(80, 80, 80);
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'italic');
-      const lines = doc.splitTextToSize(result.risk_summary, 175);
-      doc.text(lines, 14, y);
-      y += lines.length * 5 + 6;
-    }
-
-    function addSection(title, items, bgColor, textColor) {
-      if (!items || items.length === 0) return;
-      if (y > 260) addPage();
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(100, 100, 100);
-      doc.text(title.toUpperCase(), 14, y);
-      y += 5;
-      items.forEach(item => {
-        if (y > 265) addPage();
-        const lines = doc.splitTextToSize(`• ${item}`, 170);
-        doc.setFillColor(...bgColor);
-        doc.rect(14, y - 3, 182, lines.length * 5 + 4, 'F');
-        doc.setTextColor(...textColor);
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'normal');
-        doc.text(lines, 18, y + 1);
-        y += lines.length * 5 + 5;
-      });
-      y += 4;
-    }
-
-    addSection('Hazards Identified', result.hazards_identified, [253, 234, 234], [107, 26, 26]);
-    addSection('Immediate Actions', result.immediate_actions, [234, 250, 241], [26, 74, 46]);
-    addSection('Recommended Modifications', result.recommended_modifications, [254, 249, 231], [93, 64, 0]);
-    addSection('Kerala-Specific Notes', result.kerala_specific_notes, [254, 249, 231], [93, 64, 0]);
-    addSection('Already Safe', result.positive_observations, [234, 250, 241], [26, 74, 46]);
+    html += `
+    <div class="room-page">
+      <div class="room-header">
+        <h2>${roomName}</h2>
+        <span class="risk-badge" style="background:${bg};color:${col};">${risk.toUpperCase()} RISK</span>
+      </div>
+      ${result.risk_summary ? `<p class="summary">${result.risk_summary}</p>` : ''}
+      ${section('Hazards Identified', result.hazards_identified, '#fdeaea', '#6b1a1a')}
+      ${section('Immediate Actions', result.immediate_actions, '#eafaf1', '#1a4a2e')}
+      ${section('Recommended Modifications', result.recommended_modifications, '#fef9e7', '#5d4000')}
+      ${section('Kerala-Specific Notes', result.kerala_specific_notes, '#fef9e7', '#5d4000')}
+      ${section('Already Safe', result.positive_observations, '#eafaf1', '#1a4a2e')}
+    </div>`;
   });
 
-  // Disclaimer page
-  addPage();
-  doc.setFillColor(...LIGHT);
-  doc.rect(14, y, 182, 40, 'F');
-  doc.setTextColor(80, 80, 80);
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'italic');
-  const disclaimer = doc.splitTextToSize('This report is generated by AI analysis of uploaded photos and is intended as a preliminary screening tool only. It does not replace a professional home safety assessment by a qualified occupational therapist or LivEzee Personal Wellbeing Manager. LivEzee recommends a physical home visit to validate and act on these findings before making any structural modifications.', 170);
-  doc.text(disclaimer, 20, y + 8);
+  html += `
+    <div style="padding:20pt 30pt;">
+      <div class="disclaimer">
+        This report is generated by AI analysis of uploaded photos and is intended as a preliminary screening tool only.
+        It does not replace a professional home safety assessment by a qualified occupational therapist or LivEzee Personal Wellbeing Manager.
+        LivEzee recommends a physical home visit to validate and act on these findings before making any structural modifications.
+      </div>
+    </div>
+    </body></html>`;
 
-  const filename = `LivEzee_EzeeHome_${(data.clientName || 'Report').replace(/\s+/g, '_')}_${data.date.replace(/\s+/g, '_')}.pdf`;
-  doc.save(filename);
+  const blob = new Blob([html], { type: 'application/msword' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `LivEzee_EzeeHome_${(data.clientName || 'Report').replace(/\s+/g, '_')}_${data.date.replace(/\s+/g, '_')}.doc`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function resetTool() {
