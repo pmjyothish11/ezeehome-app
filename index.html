@@ -668,7 +668,7 @@
     <div class="details-row">
       <div class="field">
         <label>Client name</label>
-        <input type="text" id="client-name" placeholder="Enter Client/Customer Name" />
+        <input type="text" id="client-name" placeholder="e.g. Enter name of client/customer/prospect" />
       </div>
       <div class="field">
         <label>Address / Location</label>
@@ -911,13 +911,23 @@ Be specific to what you actually see. Do not fabricate findings.`;
       const text = data.content?.[0]?.text || '{}';
       try {
         const cleaned = text.replace(/```json|```/g, '').trim();
-        results[room.id] = JSON.parse(cleaned);
+        const parsed = JSON.parse(cleaned);
+        results[room.id] = {
+          room: parsed.room || room.name,
+          overall_risk: parsed.overall_risk || 'medium',
+          risk_summary: parsed.risk_summary || 'Assessment completed.',
+          hazards_identified: parsed.hazards_identified || [],
+          immediate_actions: parsed.immediate_actions || [],
+          recommended_modifications: parsed.recommended_modifications || [],
+          kerala_specific_notes: parsed.kerala_specific_notes || [],
+          positive_observations: parsed.positive_observations || []
+        };
       } catch {
         results[room.id] = {
           room: room.name,
           overall_risk: 'medium',
-          risk_summary: 'Analysis completed.',
-          hazards_identified: [text.substring(0, 200)],
+          risk_summary: 'Analysis completed — manual review recommended.',
+          hazards_identified: [],
           immediate_actions: [],
           recommended_modifications: [],
           kerala_specific_notes: [],
@@ -1122,18 +1132,21 @@ function generatePDF() {
     addPage();
     const room = ROOMS.find(r => r.id === roomId);
 
+    const roomName = result.room || room?.name || 'Room';
+    const riskLevel = result.overall_risk || 'medium';
+
     // Room header
     doc.setFillColor(...NAVY);
     doc.rect(14, y, 182, 14, 'F');
     doc.setTextColor(...WHITE);
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
-    doc.text(`${room?.icon || ''} ${result.room}`, 20, y + 9);
-    const riskColor = result.overall_risk === 'high' ? [192, 57, 43] : result.overall_risk === 'medium' ? [214, 137, 16] : [30, 132, 73];
+    doc.text(roomName, 20, y + 9);
+    const riskColor = riskLevel === 'high' ? [192, 57, 43] : riskLevel === 'medium' ? [214, 137, 16] : [30, 132, 73];
     doc.setFillColor(...riskColor);
     doc.roundedRect(155, y + 3, 35, 8, 2, 2, 'F');
     doc.setFontSize(8);
-    doc.text(`${result.overall_risk?.toUpperCase()} RISK`, 172.5, y + 8.5, { align: 'center' });
+    doc.text(`${riskLevel.toUpperCase()} RISK`, 172.5, y + 8.5, { align: 'center' });
     y += 20;
 
     // Summary
