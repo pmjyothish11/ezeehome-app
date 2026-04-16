@@ -1068,6 +1068,35 @@ function renderResults(data) {
       <button class="pdf-btn" onclick="generateWord()">Download Word Report</button>
       <button class="reset-btn" onclick="resetTool()">← New Assessment</button>
     </div>
+
+    <div style="background:var(--gold-light);border:1.5px solid var(--gold);border-radius:12px;padding:16px 20px;margin-top:16px;font-size:13px;color:var(--dark);">
+      ⚠ The Word report does not include photos. Use the gallery below for reference, audit, and record-keeping.
+    </div>
+
+    ${Object.entries(data.rooms).some(([id, r]) => photos[id] && photos[id].length > 0) ? `
+    <div style="margin-top:32px;">
+      <h3 style="font-family:'Fraunces',serif;font-size:20px;font-weight:400;color:var(--navy);margin-bottom:16px;">Photo Record</h3>
+      ${Object.entries(data.rooms).map(([roomId, result]) => {
+        const roomPhotos = photos[roomId] || [];
+        if (roomPhotos.length === 0) return '';
+        const room = ROOMS.find(r => r.id === roomId);
+        const roomName = result.room || room?.name || roomId;
+        return `
+          <div style="margin-bottom:28px;">
+            <div style="background:var(--navy);color:white;padding:8px 16px;border-radius:8px 8px 0 0;font-size:13px;font-weight:500;">${roomName} — ${roomPhotos.length} photo${roomPhotos.length > 1 ? 's' : ''}</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;padding:12px;background:white;border:1.5px solid var(--border);border-top:none;border-radius:0 0 8px 8px;">
+              ${roomPhotos.map((p, i) => `
+                <div style="position:relative;">
+                  <img src="${p.dataUrl}" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:6px;display:block;" />
+                  <div style="background:rgba(19,42,68,0.75);color:white;font-size:11px;padding:4px 8px;border-radius:0 0 6px 6px;text-align:center;">${roomName} · Photo ${i + 1}</div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+    ` : ''}
   `;
 }
 
