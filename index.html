@@ -737,6 +737,7 @@
               </div>
             </div>
           </div>
+          <div id="tug-mismatch-warn" style="display:none;margin-top:10px;padding:8px 12px;background:#fdeaea;border-left:3px solid var(--risk-high);border-radius:0 6px 6px 0;font-size:12px;color:#6b1a1a;line-height:1.5;"></div>
           <div class="fr-notes" style="margin-top:12px;">
             <label>PWM Observations <span class="required-star">*</span></label>
             <textarea id="tug-notes" placeholder="Describe gait, balance, assistive device use, any hesitation, environment conditions…" oninput="onTugNotesInput()"></textarea>
@@ -747,7 +748,24 @@
         <div>
           <div class="fr-block-label">Conditions &amp; Comorbidities</div>
           <div class="chip-group" id="comorbidity-chips"></div>
-          <div class="fr-notes">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+            <div class="fr-notes">
+              <label>MoCA Score <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0;">(0–30)</span></label>
+              <input type="number" id="moca-score" placeholder="e.g. 22" min="0" max="30"
+                style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:14px;background:var(--white);color:var(--text);outline:none;"
+                oninput="onMoCAInput()" />
+              <div id="moca-result" style="font-size:11px;color:var(--muted);margin-top:5px;height:16px;"></div>
+            </div>
+            <div class="fr-notes">
+              <label>MoCA version</label>
+              <select id="moca-version" onchange="onMoCAInput()"
+                style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:14px;background:var(--white);color:var(--text);outline:none;">
+                <option value="standard">Standard (English)</option>
+                <option value="malayalam">Malayalam version</option>
+              </select>
+            </div>
+          </div>
+          <div class="fr-notes" style="margin-top:8px;">
             <label>PWM Clinical Notes</label>
             <textarea id="comorbidity-notes" placeholder="Additional context on any condition — severity, recent changes, treatment status…" oninput="fallRiskData.comorbidityNotes = this.value"></textarea>
           </div>
@@ -830,13 +848,16 @@ const COMORBIDITIES = [
 ];
 
 const MEDICATIONS = [
-  { id: 'sedatives',        label: 'Sedatives / Hypnotics',   points: 3, note: 'Benzodiazepines, sleeping pills' },
-  { id: 'antipsychotics',   label: 'Antipsychotics',          points: 3, note: 'Haloperidol, Quetiapine' },
-  { id: 'antidepressants',  label: 'Antidepressants',         points: 2, note: 'SSRIs, TCAs' },
-  { id: 'antihypertensives',label: 'Antihypertensives',       points: 2, note: 'Beta-blockers, ACE inhibitors' },
-  { id: 'anticonvulsants',  label: 'Anticonvulsants',         points: 2, note: 'Phenytoin, Valproate' },
-  { id: 'diuretics',        label: 'Diuretics',               points: 1, note: 'Furosemide' },
-  { id: 'antidiabetics',    label: 'Antidiabetics',           points: 1, note: 'Insulin, Metformin' },
+  { id: 'sedatives',             label: 'Sedatives / Hypnotics',         points: 3, note: 'Benzodiazepines, sleeping pills' },
+  { id: 'antipsychotics',        label: 'Antipsychotics',                points: 3, note: 'Haloperidol, Quetiapine' },
+  { id: 'sedating_antihistamines', label: 'Sedating antihistamines',     points: 2, note: 'Diphenhydramine, ZzzQuil, Phenergan — drowsiness and dizziness' },
+  { id: 'antidepressants',       label: 'Antidepressants',               points: 2, note: 'SSRIs, TCAs' },
+  { id: 'antihypertensives',     label: 'Antihypertensives',             points: 2, note: 'Beta-blockers, ACE inhibitors, calcium channel blockers' },
+  { id: 'alpha_blockers',        label: 'Alpha blockers (prostate/BP)',  points: 2, note: 'Tamsulosin (Urimax), Alfuzosin — orthostatic hypotension and dizziness' },
+  { id: 'anticonvulsants',       label: 'Anticonvulsants',               points: 2, note: 'Phenytoin, Valproate' },
+  { id: 'diuretics',             label: 'Diuretics',                     points: 1, note: 'Furosemide' },
+  { id: 'antidiabetics',         label: 'Antidiabetics',                 points: 1, note: 'Insulin, Metformin' },
+  { id: 'bladder_agents',        label: 'Bladder / anticholinergics',    points: 1, note: 'Mirabegron (Mirago), Oxybutynin — urgency can cause rushing and falls' },
 ];
 
 // State
@@ -853,7 +874,53 @@ const fallRiskData = {
   medications: new Set(),
   comorbidityNotes: '',
   medicationNotes: '',
+  mocaScore: null,
+  mocaVersion: 'standard',
 };
+
+function onMoCAInput() {
+  const raw = parseInt(document.getElementById('moca-score').value);
+  const version = document.getElementById('moca-version').value;
+  fallRiskData.mocaScore = isNaN(raw) ? null : raw;
+  fallRiskData.mocaVersion = version;
+
+  const resultEl = document.getElementById('moca-result');
+  const cogChip = document.querySelector('#comorbidity-chips .chip[data-id="dementia"]');
+
+  if (fallRiskData.mocaScore === null) {
+    resultEl.textContent = '';
+    return;
+  }
+
+  // Malayalam version: threshold adjusted +2 points due to language/education bias
+  const score = fallRiskData.mocaScore;
+  const isMalayalam = version === 'malayalam';
+  const normalThreshold = isMalayalam ? 28 : 26;
+  const mildThreshold = isMalayalam ? 20 : 18;
+
+  let label, color, autoCog;
+  if (score >= normalThreshold) {
+    label = 'Normal cognition'; color = 'var(--risk-low)'; autoCog = false;
+  } else if (score >= mildThreshold) {
+    label = 'Mild cognitive impairment — cognitive chip auto-selected'; color = 'var(--risk-med)'; autoCog = true;
+  } else {
+    label = 'Moderate–severe impairment — cognitive chip auto-selected'; color = 'var(--risk-high)'; autoCog = true;
+  }
+
+  resultEl.textContent = label;
+  resultEl.style.color = color;
+
+  if (cogChip) {
+    if (autoCog && !fallRiskData.comorbidities.has('dementia')) {
+      fallRiskData.comorbidities.add('dementia');
+      cogChip.classList.add('selected');
+    } else if (!autoCog && fallRiskData.comorbidities.has('dementia')) {
+      fallRiskData.comorbidities.delete('dementia');
+      cogChip.classList.remove('selected');
+    }
+  }
+  updateFallRisk();
+}
 
 // ── FALL RISK: BUILD CHIPS ──
 function buildFallRiskChips() {
@@ -891,24 +958,46 @@ function toggleChip(chip, id, category) {
 }
 
 // ── TUG ──
+function expectedTugResult(secs) {
+  if (secs < 12) return 'normal';
+  if (secs <= 20) return 'borderline';
+  return 'impaired';
+}
+
+function checkTugMismatch() {
+  const warn = document.getElementById('tug-mismatch-warn');
+  if (!warn) return;
+  const t = fallRiskData.tugTime;
+  const r = fallRiskData.tugResult;
+  if (t !== null && r && r !== 'unable' && expectedTugResult(t) !== r) {
+    const expected = expectedTugResult(t);
+    const labels = { normal: 'Normal (<12s)', borderline: 'Borderline (12–20s)', impaired: 'Impaired (>20s)' };
+    warn.textContent = `⚠ Time ${t}s suggests "${labels[expected]}" — selected result doesn't match. Please confirm or correct.`;
+    warn.style.display = 'block';
+  } else {
+    warn.style.display = 'none';
+  }
+}
+
 function onTugTimeInput() {
   const val = parseFloat(document.getElementById('tug-time').value);
   fallRiskData.tugTime = isNaN(val) ? null : val;
-  // Auto-select toggle based on time if no manual override yet
-  if (!isNaN(val) && !fallRiskData.tugResult) {
+  // Always auto-update result to match time
+  if (!isNaN(val)) {
     if (val < 12) setTugResult('normal', true);
     else if (val <= 20) setTugResult('borderline', true);
     else setTugResult('impaired', true);
   }
+  checkTugMismatch();
   updateFallRisk();
 }
 
 function setTugResult(value, autoSet = false) {
-  if (!autoSet) fallRiskData.tugResult = value;
-  else fallRiskData.tugResult = value;
+  fallRiskData.tugResult = value;
   document.querySelectorAll('#tug-result-group .toggle-btn').forEach(btn => {
     btn.classList.toggle('selected', btn.dataset.value === value);
   });
+  if (!autoSet) checkTugMismatch();
   updateFallRisk();
 }
 
@@ -1243,8 +1332,11 @@ async function startAnalysis() {
     const stepEl = document.getElementById(`step-${room.id}`);
     if (stepEl) stepEl.classList.add('active');
 
+    // Cap at 5 images per room for API — all photos still shown in gallery
+    const MAX_PHOTOS_PER_ROOM = 5;
+    const photosForAPI = photos[room.id].slice(0, MAX_PHOTOS_PER_ROOM);
     const imageContents = await Promise.all(
-      photos[room.id].map(async p => ({
+      photosForAPI.map(async p => ({
         type: "image",
         source: {
           type: "base64",
@@ -1331,6 +1423,8 @@ Be specific to what you actually see. Do not fabricate findings.`;
       polypharmacy: frSnapshot.polypharmacy,
       comorbidityNotes: fallRiskData.comorbidityNotes,
       medicationNotes: fallRiskData.medicationNotes,
+      mocaScore: fallRiskData.mocaScore,
+      mocaVersion: fallRiskData.mocaVersion,
     }
   };
 
@@ -1660,6 +1754,12 @@ function resetTool() {
   document.getElementById('tug-notes').value = '';
   document.getElementById('comorbidity-notes').value = '';
   document.getElementById('medication-notes').value = '';
+  document.getElementById('moca-score').value = '';
+  document.getElementById('moca-version').value = 'standard';
+  document.getElementById('moca-result').textContent = '';
+  document.getElementById('tug-mismatch-warn').style.display = 'none';
+  fallRiskData.mocaScore = null;
+  fallRiskData.mocaVersion = 'standard';
 
   // Reset chips
   document.querySelectorAll('.chip.selected').forEach(c => c.classList.remove('selected'));
